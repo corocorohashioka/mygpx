@@ -1,0 +1,71 @@
+---
+title: "2025gw三南信、松本、八ヶ岳、峡西、梅ヶ畑"
+output:
+  html_document:
+    df_print: paged
+date: "2025-04-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(sf)
+library(mapview)
+library(dplyr)
+library(geosphere)
+library(ggplot2)
+library(leaflet)
+library(leafpop)
+```
+
+```{r, include=FALSE}
+gw_1_data <- read_sf("~/Downloads/nanshinsanson.gpx",layer = "tracks")
+gw_1_data <- gw_1_data[c(1,13)]
+gw_2_data <- read_sf("~/Downloads/matsumoto.gpx",layer = "tracks")
+gw_2_data <- gw_2_data[c(1,13)]
+gw_3_data <- read_sf("~/Downloads/mugikusa.gpx",layer = "tracks")
+gw_3_data <- gw_3_data[c(1,13)]
+gw_4_data <- read_sf("~/Downloads/day_2.gpx",layer = "tracks")
+gw_4_data <- gw_4_data[c(1,13)]
+shichoson_geo <- read_sf("/Volumes/ASADA/others/shikuchoson_data/shikushoson_geodata.geojson")
+gw_all_data <- rbind(gw_1_data,gw_2_data)
+gw_all_data <- rbind(gw_all_data,gw_3_data)
+gw_all_data <- rbind(gw_all_data,gw_4_data)
+gw_all_data <- st_combine(gw_all_data)
+```
+
+```{r}
+#市町村情報
+shichoson_info <- st_drop_geometry(shichoson_geo)
+gw_all_data <- st_transform(gw_all_data, st_crs(shichoson_geo))
+intersections <- st_intersects(shichoson_geo, gw_all_data,sparse = FALSE) %>% which(. == TRUE)
+shichoson_geo["passed"] <- 0
+shichoson_geo[intersections,"passed"] <- 1
+passed_pre_geo <- shichoson_geo[which(shichoson_geo$N03_001 %in% unique(shichoson_geo[intersections,1]$N03_001)),]
+mapview(
+  passed_pre_geo,
+  zcol = "passed",
+  layer.name = NA,
+  col.regions = c("white", "red"),
+  popup = NA,
+  label = passed_pre_geo$N03_004,
+  legend = F
+) +
+  mapview(gw_all_data,
+          label = NA)
+```
+
+```{r echo=FALSE, eval=FALSE}
+track_points <- track_points %>%
+  mutate(lon = st_coordinates(.)[,1],
+         lat = st_coordinates(.)[,2])
+track_points <- track_points %>%
+  mutate(dist = geosphere::distGeo(cbind(lon, lat), 
+                                   cbind(lag(lon), lag(lat)))) %>%
+  mutate(dist = ifelse(is.na(dist), 0, dist)) %>%
+  mutate(cumdist = cumsum(dist))
+
+ggplot(track_points, aes(x = cumdist / 1000, y = ele)) + 
+  geom_line(color = "steelblue") +
+  labs(x = "Distance (km)", y = "Elevation (m)", title = "Elevation Profile") +
+  theme_minimal()
+```
